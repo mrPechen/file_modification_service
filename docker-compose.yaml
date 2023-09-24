@@ -1,0 +1,93 @@
+version: '3'
+
+services:
+  db:
+    container_name: file_processing_postgres
+    image: postgres:latest
+    env_file:
+      - file_handler/.env
+    restart: always
+    ports:
+      - "5432:5432"
+    networks:
+      - file_processing
+
+
+  rabbitmq:
+    container_name: file_processing_rabbitmq
+    image: rabbitmq:latest
+    env_file:
+      - file_handler/.env
+    restart: always
+    ports:
+      - "5672:5672"
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 5s
+      timeout: 10s
+      retries: 200
+    networks:
+      - file_processing
+
+  celery_worker:
+    container_name: file_processing_celery
+    build:
+      context: .
+    image: celery:latest
+    env_file:
+      - file_handler/.env
+    command: celery -A file_handler.api.tasks worker --loglevel=INFO
+    restart: always
+    volumes:
+      - ./file_handler/api/files:/home/usr/app/file_handler/api/files
+    networks:
+      - file_processing
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      drf:
+        condition: service_started
+
+  flower:
+    container_name: file_processing_flower
+    build:
+      context: .
+    env_file:
+      - file_handler/.env
+    command: celery -A file_handler.api.tasks flower --address='0.0.0.0' --port=5555
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./file_handler/api/files:/home/usr/app/file_handler/api/files
+    restart: always
+    networks:
+      - file_processing
+    depends_on:
+      - celery_worker
+
+  drf:
+    container_name: file_processing_drf
+    build:
+      context: .
+    command: >
+             sh -c "
+             python main.py migrate &&
+             python main.py makemigrations &&
+             python main.py runserver 0.0.0.0:8000 --noreload"
+    ports:
+      - "8000:8000"
+    env_file:
+      - file_handler/.env
+    networks:
+      - file_processing
+    restart: always
+    volumes:
+      - ./file_handler/api/files:/home/usr/app/file_handler/api/files
+    depends_on:
+      - db
+
+
+
+networks:
+  file_processing:
+    driver: bridge
