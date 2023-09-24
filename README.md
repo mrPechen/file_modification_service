@@ -1,2 +1,6 @@
-# file_modification_service
-File modification API service.
+# File modification service.
+
+API сервис для изменения загружаемый файлов.
+
+Описание:
+- В сервисе 2 эндпоинта
