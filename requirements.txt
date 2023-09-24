@@ -1,0 +1,9 @@
+django
+djangorestframework
+environs
+psycopg2
+pandas
+celery
+rabbitmq
+opencv-python
+flower
